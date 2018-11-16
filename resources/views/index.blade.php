@@ -70,7 +70,7 @@
                             <h3 class="text-center mt-100 mb-50">You have requested larger page number than the maximum number of pages.</h3>
                             
                             @else
-                            
+
                                 <h3 class="text-center">No results!</h3>
                             
                             @endif
@@ -98,7 +98,7 @@
                         @csrf
 
                         <!--Items per page Container -->
-                        <div class="row filter-per-page-container">
+                        <div class="row filter-page-container">
                             <div class="form-group form-inline col-md-12">
                                 <label class="font-weight-bold" for="per_page"> Items per page: </label>
                                 <input class="form-control col-md-2 per-page-input" type="text" name="per_page" id="per_page"></input>
@@ -147,6 +147,11 @@
 
                             @endif
 
+                        </div>
+
+                        <div class="form-group form-inline">
+                            <label class="font-weight-bold" for="date">From Date:</label>
+                            <input type="date" class="form-control date-input" id="date" name="date"></input>
                         </div>
 
                         <!--Submit Form Button-->

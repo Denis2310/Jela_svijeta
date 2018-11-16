@@ -21,6 +21,7 @@ class CreateMealsTable extends Migration
             $table->string('status')->default('created');
             $table->string('slug')->nullable(); //Provjeriti sto je to
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

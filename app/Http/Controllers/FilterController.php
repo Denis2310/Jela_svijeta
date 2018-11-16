@@ -12,6 +12,7 @@ use App\Ingredient;
 
 use Illuminate\Support\Facades\Session;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Carbon;
 
 class FilterController extends Controller
 {
@@ -19,7 +20,7 @@ class FilterController extends Controller
     public function filter_meals(FilterRequest $request){
 
     	$per_page = 5; //default
-		
+        $requestDate = null;
         //Za ispis kategorija i tagova u filteru
         $filter_categories = Category::all();
         $filter_tags = Tag::all();
@@ -34,6 +35,20 @@ class FilterController extends Controller
     		});
     	}
 
+        if($request->date){
+            
+            $requestedDate = strtotime($request->date);
+            
+            if ($requestedDate > 0){
+
+                $requestDate = $request->date;
+            }
+            else{
+
+                return redirect()->back()->withErrors(['Year must be at least 1970.']);
+            }
+
+        }
 
         //2. Postavljanje broja jela po stranici
         if($request->per_page){ $per_page = $request->per_page; }
@@ -43,30 +58,38 @@ class FilterController extends Controller
     	if(!$request->has('category') && !$request->has('tags')) {
 	    	
 	    	//Provjera ako postoji samo zahtjev za broj jela po stranici
-	    	if(only_meals_per_page($request)){
+	    	if($requestDate){
 
-	    		$meals = Meal::paginate($per_page);
+                $meals = Meal::withTrashed()->where('created_at', '>=', $requestDate)->paginate($per_page);
+                return view('index', compact('meals', 'filter_categories', 'filter_tags'));
+
+            } else {
+
+                    if(!$request->per_page){
+
+                        return redirect('/');
+                    }
+
+                    $meals = Meal::paginate($per_page);
+                    return view('index', compact('meals', 'filter_categories', 'filter_tags'));
+            }
+
 	    		
-	    		return view('index', compact('meals', 'filter_categories', 'filter_tags'));
-	    	}
-        	
-            //Ne postoji nikakvi zahtjev i vrati se na početak
-    	    return redirect('/');
     	
     	//Postoji samo zahtjev za kategorijom
     	} else if($request->has('category') && !$request->has('tags')) {
 
-            $result = filter_meals_by_category($request->category, $per_page);
+            $result = filter_meals_by_category($request->category, $per_page, $requestDate);
 
         //Postoji samo zahtjev za tagovima
         } else if(!$request->has('category') && $request->has('tags')) {
 
-       		$result = filter_meals_by_tags($request->tags, $per_page);
+       		$result = filter_meals_by_tags($request->tags, $per_page, $requestDate);
 
         //Postoji zahtjev za kategorijama i tagovima
         } else {
 
-        	$result = filter_meals_by_categories_and_tags($request->category, $request->tags, $per_page);
+        	$result = filter_meals_by_categories_and_tags($request->category, $request->tags, $per_page, $requestDate);
 
         }
 
@@ -80,24 +103,56 @@ class FilterController extends Controller
 }
 
 //Funkcija za dohvaćanje kategorija
-function filter_meals_by_category($category, $per_page){
+function filter_meals_by_category($category, $per_page, $requestDate=null){
 
     $message="Categories: ";
     $result = array();
+    
+    if(isset($requestDate)){
+
+        $meals = Meal::withTrashed()->where('created_at' ,'>=', $requestDate);
+
+    };
 
     if($category[0] === '!null') {
             
-            $meals = Meal::where('category_id','!=', NULL)->paginate($per_page);
             $message = " With Category";
 
-    } else if ($category[0] === 'null'){
+            if(isset($meals)){
 
-            $meals = Meal::where('category_id','=', NULL)->paginate($per_page);
+                $meals = $meals->where('category_id', '!=', NULL)->paginate($per_page);
+            }else{
+
+                $meals = Meal::where('category_id','!=', NULL)->paginate($per_page);
+            }
+                
+
+
+    } else if ($category[0] === 'null'){
+           
             $message = " Without Category";
+
+            if(isset($meals)){
+
+                $meals = $meals->where('category_id', '=', NULL)->paginate($per_page);
+            }else{
+                
+                $meals = Meal::where('category_id','=', NULL)->paginate($per_page);
+            }
+
+
 
         } else {
 
-            $meals = Meal::whereIn('category_id', $category)->paginate($per_page);
+            
+            if(isset($meals)){
+
+                $meals = $meals->whereIn('category_id', $category)->paginate($per_page);
+            }else{
+                
+                $meals = Meal::whereIn('category_id', $category)->paginate($per_page);
+            }
+
             $requested_categories = Category::all()->whereIn('id', $category);
 
             foreach($requested_categories as $category){
@@ -113,22 +168,39 @@ function filter_meals_by_category($category, $per_page){
 }
 
 //Funkcija za dohvaćanje tagova
-function filter_meals_by_tags($tags, $per_page){
+function filter_meals_by_tags($tags, $per_page, $requestDate=null){
 
 	$message="Tags:";
 
-	//Pronađeno riješenje koristeći stack overflow , moj način pretraživanja tagova nalazi se ispod u komentaru
-	$meals = Meal::when($tags, function($query) use ($tags){
-	             
-	             foreach($tags as $tag){
-	                 	
-	                 $query->whereHas('tags', function($query) use ($tag){
+    if(isset($requestDate)){
 
-	                 	$query->where('tag_id', $tag);
-	                });
-	             }
-	         });
+        $meals = Meal::withTrashed()->where('created_at' ,'>=', $requestDate);
+        
+        $meals = $meals->when($tags, function($query) use ($tags){
+                             
+                             foreach($tags as $tag){
+                                    
+                                 $query->whereHas('tags', function($query) use ($tag){
 
+                                    $query->where('tag_id', $tag);
+                                });
+                             }
+                         });
+
+    } else {
+
+        $meals = Meal::when($tags, function($query) use ($tags){
+                     
+                     foreach($tags as $tag){
+                            
+                         $query->whereHas('tags', function($query) use ($tag){
+
+                            $query->where('tag_id', $tag);
+                        });
+                     }
+                 });
+
+    }
 
     $requested_tags = Tag::all()->whereIn('id', $tags);
 	foreach($requested_tags as $tag){
@@ -143,64 +215,125 @@ function filter_meals_by_tags($tags, $per_page){
 }
 
 //Funkcija za dohvaćanje kategorija i tagova
-function filter_meals_by_categories_and_tags($category, $tags, $per_page){
+function filter_meals_by_categories_and_tags($category, $tags, $per_page, $requestDate=null){
 
     $message="";
 
-    if($category[0] === '!null') {
-       	
-       	$message = $message." With Categories";
+    if(isset($requestDate)){
 
-        $meals = Meal::when($tags, function($query) use ($tags){
-         
-         foreach($tags as $tag){
-             $query->whereHas('tags', function($query) use ($tag){
+        $meals = Meal::withTrashed()->where('created_at' ,'>=', $requestDate);
 
-             	$query->where('tag_id', $tag);
-            });
-         }
-    	})->where('category_id','!=', NULL);
+         if($category[0] === '!null') {
+                
+                $message = $message." With Categories";
+
+                $meals = $meals->when($tags, function($query) use ($tags){
+                 
+                 foreach($tags as $tag){
+                     $query->whereHas('tags', function($query) use ($tag){
+
+                        $query->where('tag_id', $tag);
+                    });
+                 }
+                })->where('category_id','!=', NULL);
 
 
-    } else if ($category[0] === 'null'){
+            } else if ($category[0] === 'null'){
 
-       	$message = $message." Without Category";
+                $message = $message." Without Category";
 
-        $meals = Meal::when($tags, function($query) use ($tags){
-         
-         foreach($tags as $tag){
-             $query->whereHas('tags', function($query) use ($tag){
+                $meals = $meals->when($tags, function($query) use ($tags){
+                 
+                 foreach($tags as $tag){
+                     $query->whereHas('tags', function($query) use ($tag){
 
-             	$query->where('tag_id', $tag);
-            });
-         }
-    	})->where('category_id','=', NULL);
-            
+                        $query->where('tag_id', $tag);
+                    });
+                 }
+                })->where('category_id','=', NULL);
+                    
+
+            } else {
+
+                $message = $message." Categories: ";
+
+                $meals = $meals->when($tags, function($query) use ($tags){
+                 
+                 foreach($tags as $tag){
+                        
+                     $query->whereHas('tags', function($query) use ($tag){
+
+                        $query->where('tag_id', $tag);
+                    });
+                 }
+                })->whereIn('category_id', $category); 
+
+                $requested_categories = Category::all()->whereIn('id', $category);
+
+                foreach($requested_categories as $category){
+
+                    $message = $message.$category->title." ";
+                }
+            }
+
 
     } else {
 
-    	$message = $message." Categories: ";
+     if($category[0] === '!null') {
+            
+            $message = $message." With Categories";
 
-        $meals = Meal::when($tags, function($query) use ($tags){
-         
-         foreach($tags as $tag){
-             	
-             $query->whereHas('tags', function($query) use ($tag){
+            $meals = Meal::when($tags, function($query) use ($tags){
+             
+             foreach($tags as $tag){
+                 $query->whereHas('tags', function($query) use ($tag){
 
-             	$query->where('tag_id', $tag);
-            });
-         }
-    	})->whereIn('category_id', $category); 
+                    $query->where('tag_id', $tag);
+                });
+             }
+            })->where('category_id','!=', NULL);
 
-    	$requested_categories = Category::all()->whereIn('id', $category);
 
-    	foreach($requested_categories as $category){
+        } else if ($category[0] === 'null'){
 
-    		$message = $message.$category->title." ";
-    	}
+            $message = $message." Without Category";
+
+            $meals = Meal::when($tags, function($query) use ($tags){
+             
+             foreach($tags as $tag){
+                 $query->whereHas('tags', function($query) use ($tag){
+
+                    $query->where('tag_id', $tag);
+                });
+             }
+            })->where('category_id','=', NULL);
+                
+
+        } else {
+
+            $message = $message." Categories: ";
+
+            $meals = Meal::when($tags, function($query) use ($tags){
+             
+             foreach($tags as $tag){
+                    
+                 $query->whereHas('tags', function($query) use ($tag){
+
+                    $query->where('tag_id', $tag);
+                });
+             }
+            })->whereIn('category_id', $category); 
+
+            $requested_categories = Category::all()->whereIn('id', $category);
+
+            foreach($requested_categories as $category){
+
+                $message = $message.$category->title." ";
+            }
+        }
     }
-     
-    
+
+       
     $requested_tags = Tag::all()->whereIn('id', $tags);
 
     $message = $message.", "."Filtered by Tags: ";
@@ -216,17 +349,6 @@ function filter_meals_by_categories_and_tags($category, $tags, $per_page){
 
      return $result;
 } 
-
-//Funkcija za provjeru ako postoji samo zahtjev za brojem jela na stranici	
-function only_meals_per_page($request){
-
-	if(!$request->category && !$request->tag && $request->per_page) {
-
-		return true;
-	}
-
-	return false;
-}
 
 
 /******Moj način riješavanja pronalaska jela prema više tagova*****/

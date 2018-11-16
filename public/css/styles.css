@@ -42,6 +42,7 @@ strong{
 	overflow: hidden;
 }
 
+
 .left-container{
 
     padding-top: 70px;
@@ -69,17 +70,16 @@ strong{
 }
 
 .right-container{
-
+    height: 100%;
+    overflow-y: scroll;
     border-left: 1px solid #868e96;
-    padding-top: 30px;
+    padding-top: 70px;
     z-index: 1;
-    margin-top: 47px;
-    min-height: 100%;
 }
 
 /***Filter styles***/
 
-.filter-heading, .filter-per-page-container, .filter-categories-container, .filter-tags-container{
+.filter-heading, .filter-categories-container, .filter-tags-container{
 
     margin-bottom: 20px;
 }
@@ -95,6 +95,12 @@ input.page-input{
 
     position: relative;
     left: 20px;
+}
+
+input.date-input{
+
+    position: relative;
+    left: 5px;
 }
 
 
@@ -150,6 +156,7 @@ div.alert ul{
     {
         font-size:12px;
     }
+
 }
 
 @media only screen and (max-width: 1000px) {

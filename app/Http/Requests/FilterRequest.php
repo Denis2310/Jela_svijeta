@@ -30,6 +30,7 @@ class FilterRequest extends FormRequest
             'category' => 'nullable|array',
             'tags' => 'nullable|array',
             'tags.*' => 'integer',
+            'date' => 'nullable|date',
 
         ];
     }

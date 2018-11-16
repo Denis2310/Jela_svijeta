@@ -4,14 +4,13 @@ namespace App;
 
 use Illuminate\Database\Eloquent\Model;
 use \Dimsav\Translatable\Translatable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Meal extends Model
 {   
-
-    /*use Translatable;*/
-
-    /*public $translatedAttributes = ['title', 'description'];
-    public $translationModel = 'App\MealTranslation';*/
+    use SoftDeletes;
+    
+    protected $dates = ['deleted_at'];
     
 
     //Jelo pripada jednoj kategoriji
